@@ -12,8 +12,6 @@ const Items = () => {
   const [filteredItems, setFilteredItems] = useState([]);
   const [showUploadChoice, setShowUploadChoice] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [showBulkUpload, setShowBulkUpload] = useState(false);
-  const [csvFile, setCsvFile] = useState(null);
   const [toastMessage, setToastMessage] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [editItemId, setEditItemId] = useState(null);
@@ -32,7 +30,8 @@ const Items = () => {
   });
 
   useEffect(() => {
-    fetchItems();
+    const localData = JSON.parse(localStorage.getItem("items")) || [];
+    setItems(localData);
   }, []);
 
   useEffect(() => {
@@ -46,57 +45,33 @@ const Items = () => {
     setFilteredItems(filtered);
   }, [searchTerm, category, items]);
 
-  const fetchItems = async () => {
-    try {
-      const response = await fetch("http://localhost:5000/api/items");
-      const data = await response.json();
-      setItems(data);
-    } catch (error) {
-      console.error("Error fetching items:", error);
-    }
-  };
-
   const showToast = (message) => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(""), 3000);
   };
 
-  const handleAddItem = async () => {
+  const handleAddItem = () => {
     if (!newItem.name.trim() || !newItem.code.trim()) return;
 
-    const method = editMode ? "PUT" : "POST";
-    const url = editMode ? `http://localhost:5000/api/items/${editItemId}` : "http://localhost:5000/api/items";
+    let updatedItems = [...items];
 
-    try {
-      const response = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...newItem,
-          price1: +newItem.price1,
-          price2: +newItem.price2,
-          price3: +newItem.price3,
-          price4: +newItem.price4,
-          stock: +newItem.stock
-        })
-      });
-
-      if (response.ok) {
-        const updatedItems = await response.json();
-        setItems(updatedItems);
-        showToast(`✅ Item ${editMode ? "updated" : "added"} successfully`);
-        setShowModal(false);
-        setEditMode(false);
-        setEditItemId(null);
-        setNewItem({ code: "", name: "", category: "Fruits", price1: "", price2: "", price3: "", price4: "", stock: "" });
-        fetchItems();
-      } else {
-        showToast(`❌ Failed to ${editMode ? "update" : "add"} item`);
-      }
-    } catch (error) {
-      console.error("Error submitting item:", error);
-      showToast("❌ Error occurred while submitting item");
+    if (editMode) {
+      updatedItems = updatedItems.map((item) =>
+        item._id === editItemId ? { ...newItem, _id: editItemId } : item
+      );
+      showToast("✅ Item updated successfully");
+    } else {
+      const newId = Date.now().toString();
+      updatedItems.push({ ...newItem, _id: newId });
+      showToast("✅ Item added successfully");
     }
+
+    localStorage.setItem("items", JSON.stringify(updatedItems));
+    setItems(updatedItems);
+    setShowModal(false);
+    setEditMode(false);
+    setEditItemId(null);
+    setNewItem({ code: "", name: "", category: "Fruits", price1: "", price2: "", price3: "", price4: "", stock: "" });
   };
 
   const handleEdit = (item) => {
@@ -106,42 +81,11 @@ const Items = () => {
     setShowModal(true);
   };
 
-  const handleDelete = async (id) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/items/${id}`, { method: "DELETE" });
-      if (response.ok) {
-        fetchItems();
-        showToast("🗑️ Item deleted successfully");
-      } else {
-        showToast("❌ Failed to delete item");
-      }
-    } catch (error) {
-      console.error("Error deleting item:", error);
-      showToast("❌ Error occurred while deleting item");
-    }
-  };
-
-  const handleCSVUpload = async () => {
-    if (!csvFile) return;
-    const formData = new FormData();
-    formData.append("file", csvFile);
-    try {
-      const response = await fetch("http://localhost:5000/api/items/bulk", {
-        method: "POST",
-        body: formData,
-      });
-      if (response.ok) {
-        fetchItems();
-        showToast("✅ Items uploaded successfully");
-        setShowBulkUpload(false);
-        setCsvFile(null);
-      } else {
-        showToast("❌ Failed to upload items");
-      }
-    } catch (error) {
-      console.error("CSV Upload Error:", error);
-      showToast("❌ Error occurred while uploading CSV");
-    }
+  const handleDelete = (id) => {
+    const updated = items.filter(item => item._id !== id);
+    localStorage.setItem("items", JSON.stringify(updated));
+    setItems(updated);
+    showToast("🗑️ Item deleted successfully");
   };
 
   return (
@@ -175,7 +119,7 @@ const Items = () => {
           </div>
 
           <button
-            onClick={() => setShowUploadChoice(true)}
+            onClick={() => setShowModal(true)}
             className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mb-4"
           >
             <HiPlus /> Add Item
@@ -215,35 +159,6 @@ const Items = () => {
             </table>
           </div>
 
-          {/* Upload Options Modal */}
-          {showUploadChoice && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-              <div className="bg-white p-6 rounded shadow-md space-y-4 w-full max-w-sm relative">
-                <button className="absolute top-2 right-2 text-gray-500 hover:text-black" onClick={() => setShowUploadChoice(false)}><FaTimes /></button>
-                <h2 className="text-xl font-semibold text-center">Choose Upload Option</h2>
-                <button
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                  onClick={() => {
-                    setShowUploadChoice(false);
-                    setShowModal(true);
-                  }}
-                >
-                  Single Upload
-                </button>
-                <button
-                  className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                  onClick={() => {
-                    setShowUploadChoice(false);
-                    setShowBulkUpload(true);
-                  }}
-                >
-                  Bulk Upload
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Single Upload Form Modal */}
           {showModal && (
             <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
               <div className="bg-white p-6 rounded shadow-md w-full max-w-md relative">
@@ -281,45 +196,6 @@ const Items = () => {
                     }}>Cancel</button>
                     <button className="px-4 py-2 bg-blue-600 text-white rounded" onClick={handleAddItem}>Submit</button>
                   </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Bulk Upload Modal */}
-          {showBulkUpload && (
-            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-              <div className="bg-white p-6 rounded shadow-md w-full max-w-md relative">
-                <button className="absolute top-2 right-2 text-gray-500 hover:text-black" onClick={() => {
-                  setShowBulkUpload(false);
-                  setCsvFile(null);
-                }}><FaTimes /></button>
-                <h2 className="text-xl font-semibold mb-4">Bulk Upload Items</h2>
-                <a
-                  href="/sample.csv"
-                  download
-                  className="text-blue-600 underline mb-4 inline-block"
-                >
-                  Download Sample CSV
-                </a>
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={(e) => setCsvFile(e.target.files[0])}
-                  className="mb-4"
-                />
-                <div className="flex justify-end gap-2">
-                  <button
-                    className="px-4 py-2 bg-gray-500 text-white rounded"
-                    onClick={() => {
-                      setShowBulkUpload(false);
-                      setCsvFile(null);
-                    }}
-                  >Cancel</button>
-                  <button
-                    className="px-4 py-2 bg-green-600 text-white rounded"
-                    onClick={handleCSVUpload}
-                  >Upload</button>
                 </div>
               </div>
             </div>
