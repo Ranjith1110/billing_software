@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
-import { HiPlus, HiUpload } from "react-icons/hi";
+import { HiPlus } from "react-icons/hi";
+import { FaEdit, FaTrash, FaTimes } from "react-icons/fa";
 
 const Items = () => {
   const [active, setActive] = useState("Sale Bill");
@@ -9,14 +10,13 @@ const Items = () => {
   const [category, setCategory] = useState("All");
   const [items, setItems] = useState([]);
   const [filteredItems, setFilteredItems] = useState([]);
-  const [showModal, setShowModal] = useState(false);
   const [showUploadChoice, setShowUploadChoice] = useState(false);
-  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingIndex, setEditingIndex] = useState(null);
-  const [deleteIndex, setDeleteIndex] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [showBulkUpload, setShowBulkUpload] = useState(false);
+  const [csvFile, setCsvFile] = useState(null);
   const [toastMessage, setToastMessage] = useState("");
+  const [editMode, setEditMode] = useState(false);
+  const [editItemId, setEditItemId] = useState(null);
 
   const categoryList = ["Fruits", "Vegetables", "Others"];
 
@@ -32,6 +32,10 @@ const Items = () => {
   });
 
   useEffect(() => {
+    fetchItems();
+  }, []);
+
+  useEffect(() => {
     const filtered = items.filter((item) => {
       const matchCategory = category === "All" || item.category === category;
       const matchSearch =
@@ -42,118 +46,117 @@ const Items = () => {
     setFilteredItems(filtered);
   }, [searchTerm, category, items]);
 
+  const fetchItems = async () => {
+    try {
+      const response = await fetch("http://localhost:5000/api/items");
+      const data = await response.json();
+      setItems(data);
+    } catch (error) {
+      console.error("Error fetching items:", error);
+    }
+  };
+
   const showToast = (message) => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(""), 3000);
   };
 
-  const handleAddItem = () => {
-    if (newItem.name.trim() === "" || newItem.code.trim() === "") return;
+  const handleAddItem = async () => {
+    if (!newItem.name.trim() || !newItem.code.trim()) return;
 
-    const itemObj = {
-      ...newItem,
-      price1: +newItem.price1,
-      price2: +newItem.price2,
-      price3: +newItem.price3,
-      price4: +newItem.price4,
-      stock: +newItem.stock,
-    };
+    const method = editMode ? "PUT" : "POST";
+    const url = editMode ? `http://localhost:5000/api/items/${editItemId}` : "http://localhost:5000/api/items";
 
-    if (isEditing) {
-      const updatedItems = [...items];
-      updatedItems[editingIndex] = itemObj;
-      setItems(updatedItems);
-      showToast("✅ Item updated successfully");
-    } else {
-      setItems([...items, itemObj]);
-      showToast("✅ Item added successfully");
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...newItem,
+          price1: +newItem.price1,
+          price2: +newItem.price2,
+          price3: +newItem.price3,
+          price4: +newItem.price4,
+          stock: +newItem.stock
+        })
+      });
+
+      if (response.ok) {
+        const updatedItems = await response.json();
+        setItems(updatedItems);
+        showToast(`✅ Item ${editMode ? "updated" : "added"} successfully`);
+        setShowModal(false);
+        setEditMode(false);
+        setEditItemId(null);
+        setNewItem({ code: "", name: "", category: "Fruits", price1: "", price2: "", price3: "", price4: "", stock: "" });
+        fetchItems();
+      } else {
+        showToast(`❌ Failed to ${editMode ? "update" : "add"} item`);
+      }
+    } catch (error) {
+      console.error("Error submitting item:", error);
+      showToast("❌ Error occurred while submitting item");
     }
-
-    setNewItem({
-      code: "",
-      name: "",
-      category: "Fruits",
-      price1: "",
-      price2: "",
-      price3: "",
-      price4: "",
-      stock: "",
-    });
-    setShowModal(false);
-    setIsEditing(false);
-    setEditingIndex(null);
   };
 
-  const handleEdit = (index) => {
-    setNewItem(items[index]);
-    setIsEditing(true);
-    setEditingIndex(index);
+  const handleEdit = (item) => {
+    setEditMode(true);
+    setEditItemId(item._id);
+    setNewItem({ ...item });
     setShowModal(true);
   };
 
-  const confirmDelete = () => {
-    const updated = [...items];
-    updated.splice(deleteIndex, 1);
-    setItems(updated);
-    setShowDeleteModal(false);
-    setDeleteIndex(null);
-    showToast("🗑️ Item deleted successfully");
+  const handleDelete = async (id) => {
+    try {
+      const response = await fetch(`http://localhost:5000/api/items/${id}`, { method: "DELETE" });
+      if (response.ok) {
+        fetchItems();
+        showToast("🗑️ Item deleted successfully");
+      } else {
+        showToast("❌ Failed to delete item");
+      }
+    } catch (error) {
+      console.error("Error deleting item:", error);
+      showToast("❌ Error occurred while deleting item");
+    }
   };
 
-  const handleBulkCSV = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const csvText = event.target.result;
-      const rows = csvText.trim().split("\n");
-      rows.shift(); // Remove header
-      const parsed = rows.map((row) => {
-        const [code, name, category, price1, price2, price3, price4, stock] =
-          row.split(",");
-        return {
-          code,
-          name,
-          category,
-          price1: +price1,
-          price2: +price2,
-          price3: +price3,
-          price4: +price4,
-          stock: +stock,
-        };
+  const handleCSVUpload = async () => {
+    if (!csvFile) return;
+    const formData = new FormData();
+    formData.append("file", csvFile);
+    try {
+      const response = await fetch("http://localhost:5000/api/items/bulk", {
+        method: "POST",
+        body: formData,
       });
-      setItems((prev) => [...prev, ...parsed]);
-      setShowBulkUploadModal(false);
-      showToast("✅ Bulk items added successfully");
-    };
-    reader.readAsText(file);
-  };
-
-  const downloadSampleCSV = () => {
-    const csvContent = `Item Code,Item Name,Category,Price 1,Price 2,Price 3,Price 4,Stock\nEX001,Example Item,Fruits,10,20,30,40,100`;
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "bulk_upload_sample.csv";
-    link.click();
+      if (response.ok) {
+        fetchItems();
+        showToast("✅ Items uploaded successfully");
+        setShowBulkUpload(false);
+        setCsvFile(null);
+      } else {
+        showToast("❌ Failed to upload items");
+      }
+    } catch (error) {
+      console.error("CSV Upload Error:", error);
+      showToast("❌ Error occurred while uploading CSV");
+    }
   };
 
   return (
     <div className="h-screen flex bg-gray-100 relative">
       <Navbar />
       <Sidebar active={active} setActive={setActive} />
-
       <main className="flex-1 overflow-y-auto p-4">
         <div className="border-dashed border-2 border-gray-200 p-4 mt-18">
-          <h2 className="text-2xl font-semibold mb-6">Item List</h2>
+          <h1 className="text-2xl font-bold mb-4">Item List</h1>
 
           <div className="flex flex-wrap gap-2 mb-4">
             {["All", ...categoryList].map((cat) => (
               <button
                 key={cat}
-                className={`px-6 py-2 rounded-md ${category === cat ? "bg-red-600" : "bg-black"
-                  } text-white hover:bg-red-600`}
+                className={`px-6 py-2 rounded-md ${category === cat ? "bg-red-600" : "bg-black"} text-white hover:bg-red-600`}
                 onClick={() => setCategory(cat)}
               >
                 {cat}
@@ -161,7 +164,7 @@ const Items = () => {
             ))}
           </div>
 
-          <div className="mt-7 max-w-sm">
+          <div className="max-w-sm mb-4">
             <input
               type="text"
               placeholder="🔍 Search by item name or code..."
@@ -171,82 +174,55 @@ const Items = () => {
             />
           </div>
 
-          <div className="rounded-md mt-8">
-            <div className="overflow-x-auto">
-              <table className="min-w-full table-auto border border-gray-300">
-                <thead className="bg-gray-200">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Code</th>
-                    <th className="px-4 py-2 text-left">Item Name</th>
-                    <th className="px-4 py-2 text-left">Price 1</th>
-                    <th className="px-4 py-2 text-left">Price 2</th>
-                    <th className="px-4 py-2 text-left">Price 3</th>
-                    <th className="px-4 py-2 text-left">Price 4</th>
-                    <th className="px-4 py-2 text-left">Stock</th>
-                    <th className="px-4 py-2 text-left">Actions</th>
+          <button
+            onClick={() => setShowUploadChoice(true)}
+            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mb-4"
+          >
+            <HiPlus /> Add Item
+          </button>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full table-auto border border-gray-300 text-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border px-4 py-2">Code</th>
+                  <th className="border px-4 py-2">Name</th>
+                  <th className="border px-4 py-2">Category</th>
+                  <th className="border px-4 py-2">Price1</th>
+                  <th className="border px-4 py-2">Stock</th>
+                  <th className="border px-4 py-2 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredItems.map((item) => (
+                  <tr key={item._id} className="hover:bg-gray-50">
+                    <td className="border px-4 py-2">{item.code}</td>
+                    <td className="border px-4 py-2">{item.name}</td>
+                    <td className="border px-4 py-2">{item.category}</td>
+                    <td className="border px-4 py-2">₹{item.price1}</td>
+                    <td className="border px-4 py-2">{item.stock}</td>
+                    <td className="border px-4 py-2 text-center">
+                      <button onClick={() => handleEdit(item)} className="text-blue-600 hover:text-blue-800 mr-2">
+                        <FaEdit />
+                      </button>
+                      <button onClick={() => handleDelete(item._id)} className="text-red-600 hover:text-red-800">
+                        <FaTrash />
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {filteredItems.length > 0 ? (
-                    filteredItems.map((item, index) => (
-                      <tr key={index} className="border-t">
-                        <td className="px-4 py-2">{item.code}</td>
-                        <td className="px-4 py-2">{item.name}</td>
-                        <td className="px-4 py-2">₹{item.price1}</td>
-                        <td className="px-4 py-2">₹{item.price2}</td>
-                        <td className="px-4 py-2">₹{item.price3}</td>
-                        <td className="px-4 py-2">₹{item.price4}</td>
-                        <td className="px-4 py-2">{item.stock}</td>
-                        <td className="px-4 py-2 space-x-2">
-                          <button
-                            onClick={() => handleEdit(index)}
-                            className="text-blue-600 hover:underline"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => {
-                              setDeleteIndex(index);
-                              setShowDeleteModal(true);
-                            }}
-                            className="text-red-600 hover:underline"
-                          >
-                            Delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="8" className="text-center text-red-500 py-4">
-                        ❌ No Data Found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="flex justify-end mt-4">
-              <button
-                onClick={() => setShowUploadChoice(true)}
-                className="flex items-center gap-2 bg-black text-white px-6 py-2 rounded-md hover:bg-red-600"
-              >
-                <HiPlus className="text-lg" />
-                Add Item
-              </button>
-            </div>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
 
-        {/* Upload Choice Modal */}
-        {showUploadChoice && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-sm text-center">
-              <h3 className="text-xl font-semibold mb-4">Choose Upload Type</h3>
-              <div className="flex flex-col gap-4">
+          {/* Upload Options Modal */}
+          {showUploadChoice && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+              <div className="bg-white p-6 rounded shadow-md space-y-4 w-full max-w-sm relative">
+                <button className="absolute top-2 right-2 text-gray-500 hover:text-black" onClick={() => setShowUploadChoice(false)}><FaTimes /></button>
+                <h2 className="text-xl font-semibold text-center">Choose Upload Option</h2>
                 <button
-                  className="bg-black text-white py-2 rounded hover:bg-red-600"
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                   onClick={() => {
                     setShowUploadChoice(false);
                     setShowModal(true);
@@ -255,139 +231,106 @@ const Items = () => {
                   Single Upload
                 </button>
                 <button
-                  className="bg-gray-700 text-white py-2 rounded hover:bg-red-600"
+                  className="w-full px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                   onClick={() => {
                     setShowUploadChoice(false);
-                    setShowBulkUploadModal(true);
+                    setShowBulkUpload(true);
                   }}
                 >
                   Bulk Upload
                 </button>
-                <button
-                  className="text-sm text-gray-500 mt-2 hover:underline"
-                  onClick={() => setShowUploadChoice(false)}
-                >
-                  Cancel
-                </button>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Bulk Upload Modal */}
-        {showBulkUploadModal && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-sm text-center">
-              <h3 className="text-lg font-semibold mb-4">📤 Bulk Upload CSV</h3>
-              <button
-                className="bg-black text-white px-4 py-2 rounded hover:bg-red-600 mb-4"
-                onClick={downloadSampleCSV}
-              >
-                📥 Download Sample CSV
-              </button>
-              <label className="cursor-pointer inline-flex items-center gap-2 bg-gray-800 text-white px-4 py-2 rounded hover:bg-red-600">
-                <HiUpload />
-                Upload CSV
+          {/* Single Upload Form Modal */}
+          {showModal && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+              <div className="bg-white p-6 rounded shadow-md w-full max-w-md relative">
+                <button className="absolute top-2 right-2 text-gray-500 hover:text-black" onClick={() => {
+                  setShowModal(false);
+                  setEditMode(false);
+                  setEditItemId(null);
+                }}><FaTimes /></button>
+                <h2 className="text-xl font-semibold mb-4">{editMode ? "Edit Item" : "Add New Item"}</h2>
+                <div className="grid grid-cols-1 gap-3">
+                  {["code", "name", "price1", "price2", "price3", "price4", "stock"].map(field => (
+                    <input
+                      key={field}
+                      type={field.includes('price') || field === 'stock' ? 'number' : 'text'}
+                      placeholder={field}
+                      value={newItem[field]}
+                      onChange={e => setNewItem(prev => ({ ...prev, [field]: e.target.value }))}
+                      className="border px-3 py-2 rounded"
+                    />
+                  ))}
+                  <select
+                    value={newItem.category}
+                    onChange={e => setNewItem(prev => ({ ...prev, category: e.target.value }))}
+                    className="border px-3 py-2 rounded"
+                  >
+                    {categoryList.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  <div className="flex justify-end gap-2">
+                    <button className="px-4 py-2 bg-gray-500 text-white rounded" onClick={() => {
+                      setShowModal(false);
+                      setEditMode(false);
+                      setEditItemId(null);
+                    }}>Cancel</button>
+                    <button className="px-4 py-2 bg-blue-600 text-white rounded" onClick={handleAddItem}>Submit</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Bulk Upload Modal */}
+          {showBulkUpload && (
+            <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
+              <div className="bg-white p-6 rounded shadow-md w-full max-w-md relative">
+                <button className="absolute top-2 right-2 text-gray-500 hover:text-black" onClick={() => {
+                  setShowBulkUpload(false);
+                  setCsvFile(null);
+                }}><FaTimes /></button>
+                <h2 className="text-xl font-semibold mb-4">Bulk Upload Items</h2>
+                <a
+                  href="/sample.csv"
+                  download
+                  className="text-blue-600 underline mb-4 inline-block"
+                >
+                  Download Sample CSV
+                </a>
                 <input
                   type="file"
                   accept=".csv"
-                  className="hidden"
-                  onChange={handleBulkCSV}
+                  onChange={(e) => setCsvFile(e.target.files[0])}
+                  className="mb-4"
                 />
-              </label>
-              <button
-                className="mt-4 block text-sm text-gray-500 hover:underline"
-                onClick={() => setShowBulkUploadModal(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Single Upload Modal */}
-        {showModal && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
-              <h3 className="text-xl font-semibold mb-4">📝 Add New Item</h3>
-              <div className="grid grid-cols-1 gap-4">
-                {["code", "name", "price1", "price2", "price3", "price4", "stock"].map((field) => (
-                  <input
-                    key={field}
-                    type={field.includes("price") || field === "stock" ? "number" : "text"}
-                    placeholder={field.replace(/^\w/, (c) => c.toUpperCase())}
-                    value={newItem[field]}
-                    onChange={(e) =>
-                      setNewItem({ ...newItem, [field]: e.target.value })
-                    }
-                    className="border rounded px-4 py-2"
-                  />
-                ))}
-                <select
-                  value={newItem.category}
-                  onChange={(e) =>
-                    setNewItem({ ...newItem, category: e.target.value })
-                  }
-                  className="border rounded px-4 py-2"
-                >
-                  {categoryList.map((cat) => (
-                    <option key={cat} value={cat}>
-                      {cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex justify-end gap-2 mt-6">
-                <button
-                  className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-                  onClick={() => setShowModal(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="bg-black text-white px-4 py-2 rounded hover:bg-red-600"
-                  onClick={handleAddItem}
-                >
-                  {isEditing ? "Update Item" : "Add Item"}
-                </button>
+                <div className="flex justify-end gap-2">
+                  <button
+                    className="px-4 py-2 bg-gray-500 text-white rounded"
+                    onClick={() => {
+                      setShowBulkUpload(false);
+                      setCsvFile(null);
+                    }}
+                  >Cancel</button>
+                  <button
+                    className="px-4 py-2 bg-green-600 text-white rounded"
+                    onClick={handleCSVUpload}
+                  >Upload</button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Delete Confirmation Modal */}
-        {showDeleteModal && (
-          <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-            <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-sm text-center">
-              <h3 className="text-xl font-semibold mb-4 text-red-600">⚠️ Confirm Delete</h3>
-              <p className="mb-6">Are you sure you want to delete this item?</p>
-              <div className="flex justify-center gap-4">
-                <button
-                  className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    setDeleteIndex(null);
-                  }}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
-                  onClick={confirmDelete}
-                >
-                  Delete
-                </button>
-              </div>
+          {toastMessage && (
+            <div className="fixed bottom-4 right-4 bg-green-700 text-white px-4 py-2 rounded shadow-lg z-50">
+              {toastMessage}
             </div>
-          </div>
-        )}
-
-        {/* Toast */}
-        {toastMessage && (
-          <div className="fixed bottom-4 right-4 bg-green-700 text-white px-4 py-2 rounded shadow-lg z-50">
-            {toastMessage}
-          </div>
-        )}
+          )}
+        </div>
       </main>
     </div>
   );

@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import connectDB from './config/db.js';
 import authRoutes from './routes/authRoutes.js';
+import itemRoutes from './routes/itemRoutes.js';
 // import protectedRoutes from './routes/protectedRoutes.js'; // Example
 
 dotenv.config();
@@ -16,7 +17,7 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// Auth routes (public)
+app.use('/api/items', itemRoutes);
 app.use('/api/auth', authRoutes);
 
 // Example: Protected routes (uncomment if needed)
