@@ -12,7 +12,7 @@ import {
   HiLogout,
 } from "react-icons/hi";
 import { useNavigate, useLocation } from "react-router-dom";
-import logo from "../assets/vigilixhub-logo.png";
+import logo from "../assets/vigilixHub-logo.png";
 
 // Map menu items to routes
 const menu = [
