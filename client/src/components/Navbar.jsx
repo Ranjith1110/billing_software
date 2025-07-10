@@ -37,7 +37,7 @@ const Navbar = () => {
       <div className="flex-1"></div>
       {/* Right: Icons + Profile */}
       <div className="flex items-center gap-4">
-        <button className="text-gray-600 text-xl hover:text-blue-600">
+        {/* <button className="text-gray-600 text-xl hover:text-blue-600">
           <HiSearch />
         </button>
         <div className="relative">
@@ -46,7 +46,7 @@ const Navbar = () => {
             <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
           </span>
-        </div>
+        </div> */}
         <div
           className="relative flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-lg transition-all"
           onMouseEnter={handleMouseEnter}
