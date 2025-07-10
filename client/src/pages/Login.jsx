@@ -1,29 +1,25 @@
 import React, { useState } from 'react';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
-  const [email, setEmail] = useState(''); // Changed from username to email
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+  const handleLogin = (e) => {
     e.preventDefault();
     setError('');
-    try {
-      const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/login`, {
-        email, // Send email instead of username
-        password,
-      });
-      localStorage.setItem('token', res.data.token);
+
+    // Mock login logic
+    if (email === 'admin@example.com' && password === 'admin123') {
+      localStorage.setItem('token', 'mock-token-12345');
       navigate('/dashboard');
-    } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
+    } else {
+      setError('Invalid email or password');
     }
   };
 
-  // Handler for signup link
   const handleSignupRedirect = (e) => {
     e.preventDefault();
     navigate('/signup');
