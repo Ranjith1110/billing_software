@@ -1,21 +1,31 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { HiSearch, HiBell, HiChevronDown } from "react-icons/hi";
 import { useNavigate } from "react-router-dom";
+// import { toast } from "react-toastify"; // Optional for logout message
 
 const Navbar = () => {
   const [showDropdown, setShowDropdown] = useState(false);
+  const [userName, setUserName] = useState("User");
   const navigate = useNavigate();
 
-  // Dropdown handlers
+  useEffect(() => {
+    const userData = JSON.parse(localStorage.getItem("user"));
+    if (userData?.name) {
+      setUserName(userData.name);
+    }
+  }, []);
+
   const handleMouseEnter = () => setShowDropdown(true);
   const handleMouseLeave = () => setShowDropdown(false);
   const handleFocus = () => setShowDropdown(true);
   const handleBlur = () => setShowDropdown(false);
 
-  // Logout function
   const handleLogout = () => {
-    localStorage.removeItem("token"); // Remove auth token
-    navigate("/"); // Redirect to login page ("/" route should be your login page)
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+
+    toast.success("Logged out successfully"); // optional toast
+    navigate("/");
   };
 
   return (
@@ -27,7 +37,7 @@ const Navbar = () => {
       <div className="flex-1"></div>
       {/* Right: Icons + Profile */}
       <div className="flex items-center gap-4">
-        <button className="text-gray-600 text-xl hover:text-blue-600">
+        {/* <button className="text-gray-600 text-xl hover:text-blue-600">
           <HiSearch />
         </button>
         <div className="relative">
@@ -36,7 +46,7 @@ const Navbar = () => {
             <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping"></span>
             <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
           </span>
-        </div>
+        </div> */}
         <div
           className="relative flex items-center cursor-pointer hover:bg-gray-100 p-2 rounded-lg transition-all"
           onMouseEnter={handleMouseEnter}
@@ -51,7 +61,7 @@ const Navbar = () => {
             className="w-8 h-8 rounded-full object-cover mr-2"
           />
           <span className="hidden sm:block font-medium text-sm text-gray-700">
-            Ranjith
+            {userName}
           </span>
           <HiChevronDown className="text-gray-600 text-lg mt-1" />
           {/* Dropdown Menu */}
