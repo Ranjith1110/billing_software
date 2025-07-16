@@ -229,13 +229,13 @@ const Items = () => {
           <div className="flex flex-wrap gap-2 mb-4">
             <button
               onClick={() => setShowCategoryModal(true)}
-              className="flex items-center gap-1 bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
+              className="flex items-center gap-1 bg-red-600 text-white px-4 py-2 rounded hover:bg-black"
             >
               <FaFolderPlus /> Add Category
             </button>
             <button
               onClick={() => setShowUploadChoice(true)}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+              className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded hover:bg-black"
             >
               <HiPlus /> Add Item
             </button>
@@ -270,7 +270,7 @@ const Items = () => {
                       </button>
                       <button
                         onClick={() => setConfirmDeleteId(item._id)}
-                        className="text-red-600 hover:text-red-800"
+                        className="text-red-600"
                       >
                         <FaTrash />
                       </button>
@@ -289,7 +289,7 @@ const Items = () => {
                 </h3>
                 <div className="flex justify-center gap-4">
                   <button
-                    className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                    className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-600"
                     onClick={() => {
                       handleDelete(confirmDeleteId);
                       setConfirmDeleteId(null);
@@ -317,30 +317,43 @@ const Items = () => {
                 >
                   <FaTimes />
                 </button>
-                <h2 className="text-xl font-semibold mb-6">Add Items</h2>
+                <h2 className="text-xl font-semibold mb-6 text-center">Add Items</h2>
                 <div className="flex flex-col gap-4">
+                  {/* Manual Add */}
                   <button
                     onClick={() => {
                       setShowUploadChoice(false);
                       setShowModal(true);
                     }}
-                    className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+                    className="bg-black text-white px-4 py-2 rounded hover:bg-red-600"
                   >
                     Add Manually
                   </button>
-                  <label className="cursor-pointer bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-center">
-                    Bulk Upload via Excel
+
+                  {/* File Upload */}
+                  <label className="cursor-pointer bg-black text-white px-4 py-2 rounded hover:bg-red-600 text-center">
+                    Bulk Upload via Excel (CSV/XLSX)
                     <input
                       type="file"
-                      accept=".xlsx, .xls"
+                      accept=".csv, .xlsx, .xls"
                       hidden
                       onChange={handleFileSelection}
                     />
                   </label>
+
+                  {/* Sample Download */}
+                  <a
+                    href="/bulk_upload_sample.csv"
+                    download
+                    className="bg-red-600 text-white text-center px-4 py-2 rounded hover:bg-black"
+                  >
+                    📄 Download Sample CSV
+                  </a>
                 </div>
               </div>
             </div>
           )}
+
 
           {showUploadConfirm && (
             <div className="fixed inset-0 flex items-center justify-center backdrop-blur-sm bg-opacity-50 z-50">
