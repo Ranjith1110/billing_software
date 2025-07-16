@@ -1,92 +1,62 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e) => {
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handleLogin = async (e) => {
     e.preventDefault();
-    setError('');
+    setLoading(true);
 
-    // Mock login logic
-    if (email === 'admin@example.com' && password === 'admin123') {
-      localStorage.setItem('token', 'mock-token-12345');
+    try {
+      const res = await axios.post('http://localhost:5000/api/auth/login', form);
+      localStorage.setItem('token', res.data.token);
+      localStorage.setItem('user', JSON.stringify(res.data.user));
       navigate('/dashboard');
-    } else {
-      setError('Invalid email or password');
+    } catch (err) {
+      alert(err.response?.data?.message || 'Login failed');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSignupRedirect = (e) => {
-    e.preventDefault();
-    navigate('/signup');
-  };
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-tr from-blue-400 via-purple-400 to-pink-400">
-      <div className="bg-white/80 backdrop-blur-md shadow-2xl rounded-2xl px-10 py-8 w-full max-w-md">
-        <h2 className="text-3xl font-bold text-center text-blue-700 mb-6 tracking-wide">Welcome Back 👋</h2>
-        <form onSubmit={handleLogin} className="space-y-5">
-          {error && (
-            <div className="bg-red-100 text-red-700 rounded px-3 py-2 text-sm text-center">
-              {error}
-            </div>
-          )}
-          <div>
-            <label className="block text-gray-700 font-semibold mb-1" htmlFor="email">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none transition"
-              placeholder="Enter your email"
-              value={email}
-              autoFocus
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <label className="block text-gray-700 font-semibold mb-1" htmlFor="password">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              className="w-full px-4 py-2 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-400 focus:outline-none transition"
-              placeholder="Enter your password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          <button
-            className="w-full py-2 rounded-lg bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold text-lg shadow-md hover:from-purple-500 hover:to-blue-500 transition"
-            type="submit"
-          >
-            Login
-          </button>
-        </form>
-        <div className="mt-6 text-center">
-          <a href="#" className="text-sm text-blue-600 hover:underline">
-            Forgot password?
-          </a>
-        </div>
-        <div className="mt-4 text-center text-gray-600 text-sm">
-          Don&apos;t have an account?{' '}
-          <button
-            onClick={handleSignupRedirect}
-            className="text-purple-600 font-semibold hover:underline focus:outline-none bg-transparent"
-            type="button"
-          >
-            Sign up
-          </button>
-        </div>
-      </div>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
+      <form onSubmit={handleLogin} className="bg-white p-6 rounded shadow-md w-96">
+        <h2 className="text-xl font-bold mb-4">Login</h2>
+        <input
+          type="email"
+          name="email"
+          placeholder="Email"
+          value={form.email}
+          onChange={handleChange}
+          className="mb-3 w-full p-2 border rounded"
+          required
+        />
+        <input
+          type="password"
+          name="password"
+          placeholder="Password"
+          value={form.password}
+          onChange={handleChange}
+          className="mb-3 w-full p-2 border rounded"
+          required
+        />
+        <button
+          type="submit"
+          className="w-full bg-blue-500 text-white p-2 rounded"
+          disabled={loading}
+        >
+          {loading ? 'Logging in...' : 'Login'}
+        </button>
+      </form>
     </div>
   );
 };
