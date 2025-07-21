@@ -1,3 +1,4 @@
+// Same imports
 import React, { useState, useEffect } from "react";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
@@ -5,6 +6,7 @@ import { HiPlus } from "react-icons/hi";
 import { FaEdit, FaTrash, FaTimes, FaFolderPlus } from "react-icons/fa";
 import axios from "axios";
 
+// The entire component
 const Items = () => {
   const [active, setActive] = useState("Sale Bill");
   const [searchTerm, setSearchTerm] = useState("");
@@ -22,6 +24,7 @@ const Items = () => {
   const [toastMessage, setToastMessage] = useState("");
   const [editMode, setEditMode] = useState(false);
   const [editItemId, setEditItemId] = useState(null);
+  const [showDeleteAllModal, setShowDeleteAllModal] = useState(false); // NEW
 
   const [newItem, setNewItem] = useState({
     name: "",
@@ -99,7 +102,6 @@ const Items = () => {
           newItem,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        // newest first
         setItems((prev) => [res.data, ...prev]);
         showToast("✅ Item added successfully");
       }
@@ -133,6 +135,23 @@ const Items = () => {
     }
   };
 
+  const handleDeleteAll = async () => {
+    try {
+      for (const item of filteredItems) {
+        await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/items/${item._id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+      setItems([]); // Reset the items list
+      showToast("🗑️ All items deleted");
+    } catch (error) {
+      console.error("Failed to delete all items", error);
+      showToast("❌ Failed to delete all");
+    } finally {
+      setShowDeleteAllModal(false);
+    }
+  };
+
   const performBulkUpload = async (file) => {
     const formData = new FormData();
     formData.append("file", file);
@@ -147,7 +166,6 @@ const Items = () => {
           },
         }
       );
-      // newest first
       setItems((prev) => [...res.data.items, ...prev]);
       showToast("📦 Items uploaded successfully");
     } catch (error) {
@@ -239,18 +257,27 @@ const Items = () => {
             >
               <HiPlus /> Add Item
             </button>
+            <button
+              onClick={() => setShowDeleteAllModal(true)}
+              className="bg-red-600 text-white px-4 py-2 rounded hover:bg-black"
+            >
+              🗑️ Delete All
+            </button>
           </div>
 
           <div className="overflow-x-auto">
             <table className="min-w-full table-auto border border-gray-300 text-sm">
               <thead className="bg-gray-100">
-                <tr>
+                <tr className="text-left">
                   <th className="border px-4 py-2">Code</th>
                   <th className="border px-4 py-2">Name</th>
                   <th className="border px-4 py-2">Category</th>
                   <th className="border px-4 py-2">Price1</th>
+                  <th className="border px-4 py-2">Price2</th>
+                  <th className="border px-4 py-2">Price3</th>
+                  <th className="border px-4 py-2">Price4</th>
                   <th className="border px-4 py-2">Stock</th>
-                  <th className="border px-4 py-2 text-center">Actions</th>
+                  <th className="border px-4 py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -260,8 +287,11 @@ const Items = () => {
                     <td className="border px-4 py-2">{item.name}</td>
                     <td className="border px-4 py-2">{item.category}</td>
                     <td className="border px-4 py-2">₹{item.price1}</td>
+                    <td className="border px-4 py-2">₹{item.price2}</td>
+                    <td className="border px-4 py-2">₹{item.price3}</td>
+                    <td className="border px-4 py-2">₹{item.price4}</td>
                     <td className="border px-4 py-2">{item.stock}</td>
-                    <td className="border px-4 py-2 text-center">
+                    <td className="border px-4 py-2">
                       <button
                         onClick={() => handleEdit(item)}
                         className="text-blue-600 hover:text-blue-800 mr-2"
@@ -490,6 +520,31 @@ const Items = () => {
               {toastMessage}
             </div>
           )}
+
+          {showDeleteAllModal && (
+            <div className="fixed inset-0 flex items-center justify-center backdrop-blur-sm bg-opacity-50 z-50">
+              <div className="bg-white p-6 rounded shadow-md w-full max-w-sm text-center relative">
+                <h3 className="text-lg font-semibold mb-4">
+                  Are you sure you want to delete <strong>all items?</strong>
+                </h3>
+                <div className="flex justify-center gap-4">
+                  <button
+                    className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                    onClick={handleDeleteAll}
+                  >
+                    Yes, Delete All
+                  </button>
+                  <button
+                    className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+                    onClick={() => setShowDeleteAllModal(false)}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
         </div>
       </main>
     </div>
