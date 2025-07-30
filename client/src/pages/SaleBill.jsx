@@ -1,180 +1,216 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
+import axios from "axios";
 
 const SaleBill = () => {
   const [active, setActive] = useState("Sale Bill");
+  const [invoiceNo, setInvoiceNo] = useState("");
+  const [items, setItems] = useState([{ item: "", qty: 0, amount: 0, sgst: 0, cgst: 0 }]);
+  const [form, setForm] = useState({
+    date: "",
+    time: "",
+    salesman: "",
+    customerRef: "",
+    customerName: "",
+    paymentMode: "",
+    priceType: ""
+  });
+  const [totals, setTotals] = useState({ totalAmount: 0, totalGST: 0 });
+  const [showNextBillBtn, setShowNextBillBtn] = useState(false);
+  const [allItems, setAllItems] = useState([]);
+
+  const fetchNextInvoice = async () => {
+    const res = await axios.get("/api/sales/latest", {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+    });
+    setInvoiceNo(res.data.nextInvoice);
+  };
+
+  const fetchItems = async () => {
+    const res = await axios.get("/api/items", {
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+    });
+    setAllItems(res.data);
+  };
+
+  useEffect(() => {
+    fetchNextInvoice();
+    fetchItems();
+
+    const today = new Date().toISOString().split("T")[0];
+    setForm(prev => ({ ...prev, date: today }));
+  }, []);
+
+  useEffect(() => {
+    const amountSum = items.reduce((sum, i) => sum + Number(i.amount), 0);
+    const gstSum = items.reduce((sum, i) => Number(sum) + Number(i.sgst || 0) + Number(i.cgst || 0), 0);
+    setTotals({ totalAmount: amountSum, totalGST: gstSum });
+  }, [items]);
+
+  const handleItemChange = (index, field, value) => {
+    const updated = [...items];
+    updated[index][field] = value;
+
+    if (field === "item") {
+      const matched = allItems.find(i => i.name === value);
+      if (matched) {
+        const priceField = form.priceType.toLowerCase();
+        const price = matched[priceField] || matched.price1 || 0;
+        updated[index].amount = price * (updated[index].qty || 1);
+      }
+    }
+
+    if (field === "qty") {
+      const matched = allItems.find(i => i.name === updated[index].item);
+      if (matched) {
+        const priceField = form.priceType.toLowerCase();
+        const price = matched[priceField] || matched.price1 || 0;
+        updated[index].amount = price * value;
+      }
+    }
+
+    setItems(updated);
+  };
+
+  const addRow = () => {
+    setItems([...items, { item: "", qty: 0, amount: 0, sgst: 0, cgst: 0 }]);
+  };
+
+  const handleSubmit = async () => {
+    try {
+      await axios.post(
+        "/api/sales",
+        {
+          invoiceNo,
+          ...form,
+          items,
+          totalAmount: totals.totalAmount,
+          totalGST: totals.totalGST
+        },
+        {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` }
+        }
+      );
+      alert("Saved Successfully");
+      setShowNextBillBtn(true);
+    } catch (error) {
+      alert("Error saving bill");
+    }
+  };
+
+  const handleNextBill = async () => {
+    setForm({
+      date: new Date().toISOString().split("T")[0],
+      time: "",
+      salesman: "",
+      customerRef: "",
+      customerName: "",
+      paymentMode: "",
+      priceType: ""
+    });
+    setItems([{ item: "", qty: 0, amount: 0, sgst: 0, cgst: 0 }]);
+    setShowNextBillBtn(false);
+    await fetchNextInvoice();
+  };
 
   return (
-    <>
-      <div className="h-screen flex bg-gray-100">
-        <Navbar />
-        <Sidebar active={active} setActive={setActive} />
+    <div className="flex h-screen bg-gray-100">
+      <Navbar />
+      <Sidebar active={active} setActive={setActive} />
 
-        {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-4 transition-all duration-300">
-          <div className="border-dashed border-2 border-gray-200 p-4 mt-18">
-            <h2 className="text-2xl font-semibold mb-6">Sales Invoice</h2>
+      <main className="flex-1 overflow-y-auto p-6 mt-15">
+        <div className="bg-white rounded-xl shadow-md p-6 border border-gray-200">
+          <h2 className="text-3xl font-bold text-gray-800 mb-6">Sales Invoice</h2>
 
-            {/* Input Rows */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium">Invoice No</label>
-                <input type="text" className="w-full px-3 py-2 border rounded-md" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Date</label>
-                <input type="date" className="w-full px-3 py-2 border rounded-md" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Time</label>
-                <input type="time" className="w-full px-3 py-2 border rounded-md" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Salesman</label>
-                <select className="w-full px-3 py-2 border rounded-md">
-                  <option>Select Salesman</option>
-                  <option>John</option>
-                  <option>Ravi</option>
-                  <option>Ayesha</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium">Customer Ref</label>
-                <input type="text" className="w-full px-3 py-2 border rounded-md" />
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <input type="text" value={invoiceNo} disabled className="input" />
+            <input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="input" />
+            <input type="time" value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} className="input" />
+            <select value={form.salesman} onChange={e => setForm({ ...form, salesman: e.target.value })} className="input">
+              <option>Select Salesman</option>
+              <option>John</option>
+              <option>Ravi</option>
+              <option>Ayesha</option>
+            </select>
+            <input type="text" placeholder="Customer Ref" value={form.customerRef} onChange={e => setForm({ ...form, customerRef: e.target.value })} className="input" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+            <input type="text" placeholder="Customer Name" value={form.customerName} onChange={e => setForm({ ...form, customerName: e.target.value })} className="input col-span-2" />
+            <div className="flex items-center gap-4">
+              {["Cash", "Card", "UPI"].map(mode => (
+                <label className="flex items-center gap-1 text-gray-600" key={mode}>
+                  <input type="radio" name="paymentMode" value={mode} checked={form.paymentMode === mode} onChange={e => setForm({ ...form, paymentMode: e.target.value })} />
+                  {mode}
+                </label>
+              ))}
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium">Customer Name</label>
-                <input type="text" className="w-full px-3 py-2 border rounded-md" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Payment Mode</label>
-                <div className="flex gap-3">
-                  <label className="flex items-center gap-1">
-                    <input type="radio" name="paymentMode" /> Cash
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input type="radio" name="paymentMode" /> Card
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input type="radio" name="paymentMode" /> UPI
-                  </label>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium mb-1">Price Type</label>
-                <div className="flex gap-3">
-                  <label className="flex items-center gap-1">
-                    <input type="radio" name="priceType" /> Retail
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input type="radio" name="priceType" /> Wholesale
-                  </label>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium">D.O No</label>
-                <input type="text" className="w-full px-3 py-2 border rounded-md" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium opacity-0">D.O No</label>
-                <input type="text" className="w-full px-3 py-2 border rounded-md" />
-              </div>
-            </div>
-
-            {/* Sales Table - Redesigned */}
-            <div className="overflow-x-auto bg-white shadow rounded-lg mb-6">
-              <table className="min-w-full table-auto text-sm text-gray-700">
-                <thead className="bg-gray-100 border-b">
-                  <tr>
-                    <th className="px-4 py-3 text-left font-semibold">Barcode / Item Name</th>
-                    <th className="px-4 py-3 text-center font-semibold">Unit</th>
-                    <th className="px-4 py-3 text-center font-semibold">Qty</th>
-                    <th className="px-4 py-3 text-center font-semibold">FOC</th>
-                    <th className="px-4 py-3 text-center font-semibold">Rate</th>
-                    <th className="px-4 py-3 text-center font-semibold">Amount</th>
-                    <th className="px-4 py-3 text-center font-semibold">SGST</th>
-                    <th className="px-4 py-3 text-center font-semibold">CGST</th>
-                    <th className="px-4 py-3 text-center font-semibold">IGST</th>
-                    <th className="px-4 py-3 text-center font-semibold">+ Add</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  <tr>
-                    <td className="px-4 py-2">
-                      <input type="text" placeholder="Item name or barcode" className="w-full border border-gray-300 rounded px-2 py-1" />
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <input type="text" className="w-16 border border-gray-300 rounded px-2 py-1 text-center" />
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <input type="number" className="w-16 border border-gray-300 rounded px-2 py-1 text-center" />
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <input type="number" className="w-16 border border-gray-300 rounded px-2 py-1 text-center" />
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <input type="number" className="w-20 border border-gray-300 rounded px-2 py-1 text-center" />
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <input type="number" className="w-24 border border-gray-300 rounded px-2 py-1 text-center" />
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <input type="number" className="w-16 border border-gray-300 rounded px-2 py-1 text-center" />
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <input type="number" className="w-16 border border-gray-300 rounded px-2 py-1 text-center" />
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <input type="number" className="w-16 border border-gray-300 rounded px-2 py-1 text-center" />
-                    </td>
-                    <td className="px-4 py-2 text-center">
-                      <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 transition">+ Add</button>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-
-
-            {/* Totals - Redesigned */}
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-6">
-              <div className="bg-white shadow p-4 rounded-lg border-l-4 border-green-500">
-                <h4 className="text-sm text-gray-500 mb-1">Total Rupees</h4>
-                <p className="text-xl font-semibold text-gray-800">₹0.00</p>
-              </div>
-
-              <div className="bg-white shadow p-4 rounded-lg border-l-4 border-yellow-500">
-                <h4 className="text-sm text-gray-500 mb-1">Total GST</h4>
-                <p className="text-xl font-semibold text-gray-800">₹0.00</p>
-              </div>
-
-              <div className="bg-white shadow p-4 rounded-lg border-l-4 border-blue-500">
-                <h4 className="text-sm text-gray-500 mb-1">Net Total</h4>
-                <p className="text-xl font-semibold text-gray-800">₹0.00</p>
-              </div>
-
-              <div className="bg-white shadow p-4 rounded-lg border-l-4 border-red-500">
-                <h4 className="text-sm text-gray-500 mb-1">Customer Balance</h4>
-                <p className="text-xl font-semibold text-gray-800">₹0.00</p>
-              </div>
-            </div>
-
-
-            {/* Buttons */}
-            <div className="flex justify-center gap-4">
-              <button className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Save</button>
-              <button className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700">Print</button>
-              <button className="bg-yellow-500 text-white px-6 py-2 rounded hover:bg-yellow-600">Clear</button>
-              <button className="bg-red-600 text-white px-6 py-2 rounded hover:bg-red-700">Exit</button>
+            <div className="flex items-center gap-4">
+              {[1, 2, 3, 4].map(p => (
+                <label className="flex items-center gap-1 text-gray-600" key={p}>
+                  <input type="radio" name="priceType" value={`Price${p}`} checked={form.priceType === `Price${p}`} onChange={e => setForm({ ...form, priceType: e.target.value })} />
+                  Price{p}
+                </label>
+              ))}
             </div>
           </div>
-        </main>
-      </div>
-    </>
+
+          <div className="overflow-x-auto mb-6">
+            <table className="min-w-full text-sm border border-gray-200">
+              <thead className="bg-gray-50 text-gray-700">
+                <tr>
+                  <th className="px-4 py-2 text-left">Item</th>
+                  <th className="px-4 py-2 text-left">Qty</th>
+                  <th className="px-4 py-2 text-left">Amount</th>
+                  <th className="px-4 py-2 text-left">SGST</th>
+                  <th className="px-4 py-2 text-left">CGST</th>
+                  <th className="px-4 py-2 text-center">+ Add</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((item, i) => (
+                  <tr key={i} className="border-t">
+                    <td>
+                      <input
+                        type="text"
+                        list="itemList"
+                        className="table-input"
+                        value={item.item}
+                        onChange={e => handleItemChange(i, "item", e.target.value)}
+                      />
+                      <datalist id="itemList">
+                        {allItems.map(it => <option key={it._id} value={it.name} />)}
+                      </datalist>
+                    </td>
+                    <td><input type="number" className="table-input" value={item.qty} onChange={e => handleItemChange(i, "qty", e.target.value)} /></td>
+                    <td><input type="number" className="table-input" value={item.amount} onChange={e => handleItemChange(i, "amount", e.target.value)} /></td>
+                    <td><input type="number" className="table-input" value={item.sgst} onChange={e => handleItemChange(i, "sgst", e.target.value)} /></td>
+                    <td><input type="number" className="table-input" value={item.cgst} onChange={e => handleItemChange(i, "cgst", e.target.value)} /></td>
+                    <td className="text-center">
+                      <button onClick={addRow} className="bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600">+</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="p-4 bg-green-50 border-l-4 border-green-500 text-green-800 font-semibold">Total: ₹{totals.totalAmount.toFixed(2)}</div>
+            <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-800 font-semibold">GST: ₹{totals.totalGST.toFixed(2)}</div>
+            <div className="p-4 bg-blue-50 border-l-4 border-blue-500 text-blue-800 font-semibold">Net: ₹{(totals.totalAmount + totals.totalGST).toFixed(2)}</div>
+          </div>
+
+          <div className="flex gap-4">
+            <button onClick={handleSubmit} className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700">Save</button>
+            {showNextBillBtn && (
+              <button onClick={handleNextBill} className="bg-indigo-600 text-white px-6 py-2 rounded hover:bg-indigo-700">Next Bill</button>
+            )}
+          </div>
+        </div>
+      </main>
+    </div>
   );
 };
 
